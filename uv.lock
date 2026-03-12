@@ -137,27 +137,15 @@ wheels = [
 [[package]]
 name = "credence-agents"
 version = "0.2.0"
-source = { editable = "../credence" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "scipy" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "langchain", marker = "extra == 'benchmark'", specifier = ">=0.2" },
-    { name = "langchain-anthropic", marker = "extra == 'benchmark'", specifier = ">=0.1" },
-    { name = "langchain-ollama", marker = "extra == 'benchmark'", specifier = ">=1.0.1" },
-    { name = "langchain-openai", marker = "extra == 'benchmark'", specifier = ">=0.1" },
-    { name = "matplotlib", marker = "extra == 'benchmark'", specifier = ">=3.7" },
-    { name = "numpy", specifier = ">=1.24" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4" },
-    { name = "pytest-cov", marker = "extra == 'dev'" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scipy", specifier = ">=1.11" },
-    { name = "seaborn", marker = "extra == 'benchmark'", specifier = ">=0.12" },
+sdist = { url = "https://files.pythonhosted.org/packages/57/45/ef71795e9eec63ad592924a7cdc27ace03e797da1029cb69748672dbaf3a/credence_agents-0.2.0.tar.gz", hash = "sha256:55a6b5eb48dbd4ffe36b5ac2ea5c307f2dbdf3954e5d9a02959d8233966a806d", size = 62104, upload-time = "2026-03-12T15:06:24.989Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/65/66/efa57ba8835b1d75197a2ba67e86a4cd69340ca5a71c90a360074130ec9e/credence_agents-0.2.0-py3-none-any.whl", hash = "sha256:f8d008f78ca3c314805dbf86550f55c2568f16d3ef8f1e599871717c73b8883b", size = 47783, upload-time = "2026-03-12T15:06:23.396Z" },
 ]
-provides-extras = ["benchmark", "dev"]
 
 [[package]]
 name = "credence-router"
@@ -212,7 +200,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", marker = "extra == 'all'" },
     { name = "anthropic", marker = "extra == 'anthropic'" },
-    { name = "credence-agents", editable = "../credence" },
+    { name = "credence-agents", specifier = ">=0.2" },
     { name = "httpx", marker = "extra == 'all'" },
     { name = "httpx", marker = "extra == 'perplexity'" },
     { name = "langchain-anthropic", marker = "extra == 'all'" },

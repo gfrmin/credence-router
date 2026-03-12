@@ -37,5 +37,8 @@ class Answer:
     reasoning: str
     """Human-readable VOI trace."""
 
+    answer_posterior: tuple[float, ...] = field(default_factory=tuple)
+    """Full probability distribution over candidates at decision time."""
+
     decision_trace: tuple[dict, ...] = field(default_factory=tuple)
     """Machine-readable trace for analysis."""

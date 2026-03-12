@@ -40,6 +40,7 @@ class Router:
         scoring: ScoringRule | None = None,
         forgetting: float = 1.0,
         latency_weight: float = 0.0,
+        category_infer_fn=None,
     ):
         self._tools = tools
         self._categories = categories
@@ -58,7 +59,7 @@ class Router:
         self._agent = BayesianAgent(
             tool_configs=self._tool_configs,
             categories=categories,
-            category_infer_fn=make_keyword_category_infer_fn(categories),
+            category_infer_fn=category_infer_fn or make_keyword_category_infer_fn(categories),
             forgetting=forgetting,
             scoring=self._scoring,
             name="credence-router",
@@ -125,6 +126,8 @@ class Router:
             for s in result.decision_trace
         )
 
+        answer_posterior = tuple(self._agent._state.answer_posterior.tolist())
+
         return Answer(
             choice=result.answer,
             choice_text=choice_text,
@@ -134,6 +137,7 @@ class Router:
             effective_cost=effective_cost,
             wall_time=wall_time,
             reasoning=reasoning,
+            answer_posterior=answer_posterior,
             decision_trace=trace_dicts,
         )
 
