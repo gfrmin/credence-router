@@ -27,7 +27,8 @@ dependencies = [
 anthropic = ["anthropic"]
 perplexity = ["httpx"]
 langgraph = ["langgraph", "langchain-anthropic"]
-all = ["anthropic", "httpx", "langgraph", "langchain-anthropic"]
+compat = ["langgraph", "langchain-core>=0.2", "langchain-anthropic"]
+all = ["anthropic", "httpx", "langgraph", "langchain-anthropic", "langchain-core>=0.2"]
 dev = ["pytest", "ruff"]
 
 [project.urls]
