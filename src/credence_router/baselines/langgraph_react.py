@@ -55,22 +55,31 @@ class LangGraphReActSolver:
     def _solve_live(self, question: str, candidates: tuple[str, ...]) -> Answer:
         """Live LangGraph ReAct execution."""
         from langchain_anthropic import ChatAnthropic
-        from langchain_core.tools import tool as lc_tool
         from langgraph.prebuilt import create_react_agent
 
         # Wrap our tools as LangChain tools
+        from langchain_core.tools import StructuredTool
+
         lc_tools = []
         for t in self._tools_list:
             cands = candidates
 
-            @lc_tool(name=t.name, description=f"Query {t.name} to answer a question")
-            def query_tool(question: str, tool=t) -> str:
-                idx = tool.query(question, cands)
-                if idx is not None:
-                    return f"Answer: {cands[idx]}"
-                return "No answer available"
+            def make_query_fn(tool=t):
+                def query_tool(question: str) -> str:
+                    idx = tool.query(question, cands)
+                    if idx is not None:
+                        return f"Answer: {cands[idx]}"
+                    return "No answer available"
 
-            lc_tools.append(query_tool)
+                return query_tool
+
+            lc_tools.append(
+                StructuredTool.from_function(
+                    func=make_query_fn(t),
+                    name=t.name,
+                    description=f"Query {t.name} to answer a question",
+                )
+            )
 
         llm = ChatAnthropic(model=self._model, api_key=self._api_key)
         agent = create_react_agent(llm, lc_tools)

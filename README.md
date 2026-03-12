@@ -137,6 +137,27 @@ Returned by `router.solve()`:
 - `monetary_cost` / `effective_cost`: cost breakdown
 - `reasoning`: human-readable VOI trace
 
+## Try it: LangGraph vs credence-router (Ollama)
+
+Run a side-by-side comparison locally with zero API costs:
+
+```bash
+uv sync --extra demo
+ollama pull llama3.1
+uv run python examples/langgraph_comparison.py
+```
+
+This runs 8 questions through both LangGraph's ReAct agent (LLM-based routing)
+and credence-router's drop-in replacement (VOI-based routing), using `llama3.1`
+via Ollama. The output shows LLM calls saved and wall-clock speedup per question.
+
+The only code change:
+
+```diff
+- from langgraph.prebuilt import create_react_agent
++ from credence_router.compat import create_react_agent
+```
+
 ## Why not LangGraph?
 
 LangGraph uses an LLM to decide which tool to call. This means:
