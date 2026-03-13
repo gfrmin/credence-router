@@ -162,16 +162,53 @@ class Router:
         )
 
     def save_state_dict(self) -> dict:
-        """Return learned state as a plain dict (for embedding in larger state files)."""
-        return {
+        """Return learned state as a plain dict (for embedding in larger state files).
+
+        If any tools carry a CoveragePrior, their alpha/beta arrays are
+        included under ``coverage_alpha`` and ``coverage_beta`` keys.
+        """
+        state: dict = {
             "reliability_table": self._agent.reliability_table.tolist(),
             "tool_names": [t.name for t in self._tools],
             "categories": list(self._categories),
         }
+        cov_alpha: dict[str, list] = {}
+        cov_beta: dict[str, list] = {}
+        for t in self._tools:
+            cp = getattr(t, "coverage_prior", None)
+            if cp is not None:
+                cov_alpha[t.name] = cp.alpha.tolist()
+                cov_beta[t.name] = cp.beta.tolist()
+            elif hasattr(t, "_cov_alpha") and hasattr(t, "_cov_beta"):
+                cov_alpha[t.name] = t._cov_alpha.tolist()
+                cov_beta[t.name] = t._cov_beta.tolist()
+        if cov_alpha:
+            state["coverage_alpha"] = cov_alpha
+            state["coverage_beta"] = cov_beta
+        return state
 
     def load_state_dict(self, state: dict) -> None:
-        """Restore learned state from a dict."""
+        """Restore learned state from a dict.
+
+        If the state includes ``coverage_alpha``/``coverage_beta``, matching
+        tools' CoveragePrior (or ``_cov_alpha``/``_cov_beta``) is restored
+        and cached ToolConfigs are refreshed.
+        """
         self._agent.reliability_table = np.array(state["reliability_table"], dtype=np.float64)
+        cov_alpha = state.get("coverage_alpha", {})
+        cov_beta = state.get("coverage_beta", {})
+        if cov_alpha:
+            for idx, t in enumerate(self._tools):
+                if t.name not in cov_alpha:
+                    continue
+                cp = getattr(t, "coverage_prior", None)
+                if cp is not None:
+                    cp.alpha = np.array(cov_alpha[t.name], dtype=np.float64)
+                    cp.beta = np.array(cov_beta[t.name], dtype=np.float64)
+                elif hasattr(t, "_cov_alpha"):
+                    t._cov_alpha = np.array(cov_alpha[t.name], dtype=np.float64)
+                    t._cov_beta = np.array(cov_beta[t.name], dtype=np.float64)
+                self.refresh_tool_coverage(idx)
 
     def report_outcome(self, correct: bool) -> None:
         """Report whether the last answer was correct. Updates reliability table."""
@@ -199,23 +236,13 @@ class Router:
         return result
 
     def save_state(self, path: str | Path) -> None:
-        """Persist learned reliability table to disk."""
-        path = Path(path)
-        state = {
-            "reliability_table": self._agent.reliability_table.tolist(),
-            "tool_names": [t.name for t in self._tools],
-            "categories": list(self._categories),
-        }
-        path.write_text(json.dumps(state))
+        """Persist learned state (reliability + coverage) to disk."""
+        Path(path).write_text(json.dumps(self.save_state_dict()))
 
     def load_state(self, path: str | Path) -> None:
-        """Restore learned reliability table from disk."""
-        path = Path(path)
-        state = json.loads(path.read_text())
-        self._agent.reliability_table = np.array(
-            state["reliability_table"],
-            dtype=np.float64,
-        )
+        """Restore learned state (reliability + coverage) from disk."""
+        state = json.loads(Path(path).read_text())
+        self.load_state_dict(state)
 
     def _format_reasoning(self, trace: tuple[DecisionStep, ...]) -> str:
         """Format decision trace as human-readable text."""
