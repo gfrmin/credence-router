@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "credence-router"
-version = "0.3.0"
-description = "Transparent, cost-optimal tool routing via EU maximisation"
+version = "0.3.1"
+description = "Transparent, cost-optimal tool routing via EU maximisation. Drop-in LangGraph replacement. Built on credence."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"

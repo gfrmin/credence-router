@@ -30,6 +30,7 @@ def make_keyword_category_infer_fn(
     patterns: dict[str, re.Pattern | list[re.Pattern]],
     default_category: str | None = None,
     match_boost: float = 9.0,
+    count_matches: bool = False,
 ) -> Callable[[str], NDArray[np.float64]]:
     """Return a keyword-based category inference function.
 
@@ -44,6 +45,9 @@ def make_keyword_category_infer_fn(
         default_category: If no patterns match, this category gets a mild
             (+1.0) boost. If None, the distribution stays uniform on no match.
         match_boost: Weight added to a category when its pattern matches.
+        count_matches: If False (default), any match gives a flat boost.
+            If True, boost is proportional to total match count across all
+            patterns for that category (``match_boost * total_matches``).
     """
     n = len(categories)
     cat_index = {name: i for i, name in enumerate(categories)}
@@ -59,8 +63,12 @@ def make_keyword_category_infer_fn(
     def infer(question_text: str) -> NDArray[np.float64]:
         weights = np.ones(n, dtype=np.float64)
         for cat_name, pats in pattern_lists.items():
-            if cat_name in cat_index and any(p.search(question_text) for p in pats):
-                weights[cat_index[cat_name]] += match_boost
+            if cat_name in cat_index:
+                if count_matches:
+                    total = sum(len(p.findall(question_text)) for p in pats)
+                    weights[cat_index[cat_name]] += match_boost * total
+                elif any(p.search(question_text) for p in pats):
+                    weights[cat_index[cat_name]] += match_boost
         if default_category is not None and weights.max() == 1.0:
             if default_category in cat_index:
                 weights[cat_index[default_category]] += 1.0

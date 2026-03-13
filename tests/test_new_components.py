@@ -259,6 +259,39 @@ class TestMakeKeywordCategoryInferFn:
         d_high = infer_high("x")
         assert d_high[0] > d_low[0]  # higher boost -> more concentrated
 
+    def test_count_matches(self):
+        categories = ("combat", "exploration", "other")
+        patterns = {
+            "combat": re.compile(r"\b(?:attack|fight|sword)\b", re.IGNORECASE),
+            "exploration": re.compile(r"\b(?:room|door|passage)\b", re.IGNORECASE),
+        }
+        # Boolean mode: one match = same boost regardless of count
+        infer_bool = make_keyword_category_infer_fn(
+            categories, patterns, match_boost=2.0, count_matches=False,
+        )
+        # Count mode: multiple matches scale the boost
+        infer_count = make_keyword_category_infer_fn(
+            categories, patterns, match_boost=2.0, count_matches=True,
+        )
+        text = "attack the troll with a sword then fight again"
+        d_bool = infer_bool(text)
+        d_count = infer_count(text)
+        # Boolean mode: combat gets flat 2.0 boost
+        assert d_bool[0] == pytest.approx((1.0 + 2.0) / (3.0 + 2.0))
+        # Count mode: 3 combat matches → 6.0 boost → more concentrated
+        assert d_count[0] > d_bool[0]
+        assert d_count[0] == pytest.approx((1.0 + 6.0) / (3.0 + 6.0))
+        assert d_count.sum() == pytest.approx(1.0)
+
+    def test_count_matches_zero_hits(self):
+        categories = ("a", "b")
+        patterns = {"a": re.compile(r"\bfoo\b")}
+        infer = make_keyword_category_infer_fn(
+            categories, patterns, match_boost=5.0, count_matches=True,
+        )
+        dist = infer("nothing matches")
+        assert_allclose(dist, 0.5)  # uniform — zero matches, zero boost
+
 
 # --- make_router_category_infer_fn ---
 
