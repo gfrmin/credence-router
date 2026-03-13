@@ -40,5 +40,8 @@ class Answer:
     answer_posterior: tuple[float, ...] = field(default_factory=tuple)
     """Full probability distribution over candidates at decision time."""
 
+    tool_responses: tuple[tuple[int, int | None], ...] = field(default_factory=tuple)
+    """Per-tool responses: ((tool_idx, candidate_idx_or_None), ...). Only tools that were queried appear."""
+
     decision_trace: tuple[dict, ...] = field(default_factory=tuple)
     """Machine-readable trace for analysis."""

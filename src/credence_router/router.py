@@ -128,6 +128,11 @@ class Router:
 
         answer_posterior = tuple(self._agent._state.answer_posterior.tolist())
 
+        tool_responses = tuple(
+            (t_idx, self._agent._state.tool_responses.get(t_idx))
+            for t_idx in result.tools_queried
+        )
+
         return Answer(
             choice=result.answer,
             choice_text=choice_text,
@@ -138,8 +143,35 @@ class Router:
             wall_time=wall_time,
             reasoning=reasoning,
             answer_posterior=answer_posterior,
+            tool_responses=tool_responses,
             decision_trace=trace_dicts,
         )
+
+    @property
+    def scoring(self) -> ScoringRule:
+        """The scoring rule used by this Router."""
+        return self._scoring
+
+    def refresh_tool_coverage(self, tool_idx: int) -> None:
+        """Re-read tool.coverage() and update cached ToolConfig for a tool."""
+        tool = self._tools[tool_idx]
+        old = self._tool_configs[tool_idx]
+        self._tool_configs[tool_idx] = ToolConfig(
+            cost=old.cost,
+            coverage_by_category=tool.coverage(self._categories),
+        )
+
+    def save_state_dict(self) -> dict:
+        """Return learned state as a plain dict (for embedding in larger state files)."""
+        return {
+            "reliability_table": self._agent.reliability_table.tolist(),
+            "tool_names": [t.name for t in self._tools],
+            "categories": list(self._categories),
+        }
+
+    def load_state_dict(self, state: dict) -> None:
+        """Restore learned state from a dict."""
+        self._agent.reliability_table = np.array(state["reliability_table"], dtype=np.float64)
 
     def report_outcome(self, correct: bool) -> None:
         """Report whether the last answer was correct. Updates reliability table."""

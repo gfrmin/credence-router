@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "credence-router"
-version = "0.2.0"
+version = "0.3.0"
 description = "Transparent, cost-optimal tool routing via EU maximisation"
 readme = "README.md"
 requires-python = ">=3.11"

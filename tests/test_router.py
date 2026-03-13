@@ -149,6 +149,114 @@ class TestRouterPersistence:
                 assert abs(r1[tool_name][cat] - r2[tool_name][cat]) < 1e-10
 
 
+class TestRouterToolResponses:
+    def test_tool_responses_populated(self):
+        tools = make_default_simulated_tools()
+        router = Router(tools=tools)
+        answer = router.solve(
+            "What is the capital of France?",
+            ("Paris", "London", "Berlin", "Madrid"),
+        )
+        # tool_responses should be a tuple of (tool_idx, response) pairs
+        assert isinstance(answer.tool_responses, tuple)
+        for entry in answer.tool_responses:
+            assert isinstance(entry, tuple)
+            assert len(entry) == 2
+            t_idx, resp = entry
+            assert isinstance(t_idx, int)
+            assert resp is None or isinstance(resp, int)
+
+    def test_tool_responses_matches_tools_used(self):
+        tools = make_default_simulated_tools()
+        router = Router(tools=tools)
+        answer = router.solve(
+            "What is 2^10?",
+            ("512", "1024", "2048", "4096"),
+            category_hint="numerical",
+        )
+        # Number of tool_responses should match tools_used
+        assert len(answer.tool_responses) == len(answer.tools_used)
+
+    def test_tool_responses_empty_on_abstain(self):
+        tools = _make_simple_tools()
+        router = Router(tools=tools, categories=("factual", "numerical"))
+        answer = router.solve(
+            "Something trivial",
+            ("A", "B"),
+        )
+        # Even if abstained, tool_responses should be consistent
+        assert len(answer.tool_responses) == len(answer.tools_used)
+
+
+class TestRouterScoringProperty:
+    def test_scoring_returns_scoring_rule(self):
+        from credence.inference.voi import ScoringRule
+        tools = make_default_simulated_tools()
+        router = Router(tools=tools)
+        assert isinstance(router.scoring, ScoringRule)
+
+    def test_custom_scoring_returned(self):
+        from credence.inference.voi import ScoringRule
+        custom = ScoringRule(reward_correct=1.0, penalty_wrong=-0.5, reward_abstain=0.0)
+        tools = _make_simple_tools()
+        router = Router(tools=tools, categories=("factual", "numerical"), scoring=custom)
+        assert router.scoring.reward_correct == 1.0
+        assert router.scoring.penalty_wrong == -0.5
+
+
+class TestRouterRefreshCoverage:
+    def test_refresh_updates_tool_config(self):
+        tools = _make_simple_tools()
+        router = Router(tools=tools, categories=("factual", "numerical"))
+        old_coverage = router._tool_configs[0].coverage_by_category.copy()
+        router.refresh_tool_coverage(0)
+        # Coverage should be the same since tool hasn't changed
+        import numpy as np
+        np.testing.assert_array_equal(
+            router._tool_configs[0].coverage_by_category, old_coverage,
+        )
+
+
+class TestRouterStateDictPersistence:
+    def test_save_load_state_dict_roundtrip(self):
+        tools = make_default_simulated_tools()
+        router = Router(tools=tools)
+
+        for _ in range(3):
+            router.solve("What is 2^10?", ("512", "1024", "2048", "4096"), category_hint="numerical")
+            router.report_outcome(True)
+
+        state = router.save_state_dict()
+        assert "reliability_table" in state
+        assert "tool_names" in state
+        assert "categories" in state
+
+        router2 = Router(tools=tools)
+        router2.load_state_dict(state)
+
+        r1 = router.learned_reliability
+        r2 = router2.learned_reliability
+        for tool_name in r1:
+            for cat in r1[tool_name]:
+                assert abs(r1[tool_name][cat] - r2[tool_name][cat]) < 1e-10
+
+    def test_save_state_dict_matches_save_state(self, tmp_path):
+        import json
+        tools = make_default_simulated_tools()
+        router = Router(tools=tools)
+        router.solve("test", ("A", "B", "C", "D"))
+        router.report_outcome(True)
+
+        state_dict = router.save_state_dict()
+        state_path = tmp_path / "state.json"
+        router.save_state(state_path)
+        file_state = json.loads(state_path.read_text())
+
+        assert state_dict["reliability_table"] == file_state["reliability_table"]
+        assert state_dict["tool_names"] == file_state["tool_names"]
+        assert state_dict["categories"] == file_state["categories"]
+
+
 class TestRouterExplain:
     def test_explain_last_decision(self):
         tools = make_default_simulated_tools()
