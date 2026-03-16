@@ -1,7 +1,7 @@
 """Router: transparent, cost-optimal tool routing via EU maximisation.
 
-Wraps credence's BayesianAgent to provide a clean API for routing
-multiple-choice questions to the cheapest reliable tool.
+Wraps credence's BayesianAgent (backed by the Julia Credence DSL) to provide
+a clean API for routing multiple-choice questions to the cheapest reliable tool.
 """
 
 from __future__ import annotations
@@ -10,12 +10,11 @@ import json
 import time
 from pathlib import Path
 
-import numpy as np
-
 from credence.agents.bayesian_agent import BayesianAgent
 from credence.agents.common import DecisionStep
 from credence.environment.categories import CATEGORIES, make_keyword_category_infer_fn
 from credence.inference.voi import ScoringRule, ToolConfig
+from credence.julia_bridge import CredenceBridge
 
 from credence_router.answer import Answer
 from credence_router.tool import Tool
@@ -41,11 +40,15 @@ class Router:
         forgetting: float = 1.0,
         latency_weight: float = 0.0,
         category_infer_fn=None,
+        bridge: CredenceBridge | None = None,
     ):
         self._tools = tools
         self._categories = categories
         self._scoring = scoring or DEFAULT_SCORING
         self._latency_weight = latency_weight
+
+        # Create bridge (lazy-loads Julia on first use)
+        self._bridge = bridge or CredenceBridge()
 
         # Convert tools to ToolConfig list with effective costs
         self._tool_configs = [
@@ -57,6 +60,7 @@ class Router:
         ]
 
         self._agent = BayesianAgent(
+            bridge=self._bridge,
             tool_configs=self._tool_configs,
             categories=categories,
             category_infer_fn=category_infer_fn or make_keyword_category_infer_fn(categories),
@@ -126,10 +130,10 @@ class Router:
             for s in result.decision_trace
         )
 
-        answer_posterior = tuple(self._agent._state.answer_posterior.tolist())
+        answer_posterior = tuple(self._agent.answer_posterior)
 
         tool_responses = tuple(
-            (t_idx, self._agent._state.tool_responses.get(t_idx))
+            (t_idx, self._agent.tool_responses.get(t_idx))
             for t_idx in result.tools_queried
         )
 
@@ -164,11 +168,18 @@ class Router:
     def save_state_dict(self) -> dict:
         """Return learned state as a plain dict (for embedding in larger state files).
 
-        If any tools carry a CoveragePrior, their alpha/beta arrays are
-        included under ``coverage_alpha`` and ``coverage_beta`` keys.
+        Extracts per-tool per-category mean reliability from the Julia state.
+        If any tools carry a CoveragePrior, their alpha/beta arrays are included.
         """
+        bridge = self._bridge
+        # Extract approximate reliability table from Julia MixtureMeasure state
+        reliability_means = []
+        for t_idx in range(len(self._tools)):
+            means = bridge.extract_reliability_means(self._agent.rel_states[t_idx])
+            reliability_means.append(means)
+
         state: dict = {
-            "reliability_table": self._agent.reliability_table.tolist(),
+            "reliability_means": reliability_means,
             "tool_names": [t.name for t in self._tools],
             "categories": list(self._categories),
         }
@@ -190,14 +201,19 @@ class Router:
     def load_state_dict(self, state: dict) -> None:
         """Restore learned state from a dict.
 
-        If the state includes ``coverage_alpha``/``coverage_beta``, matching
-        tools' CoveragePrior (or ``_cov_alpha``/``_cov_beta``) is restored
-        and cached ToolConfigs are refreshed.
+        Reconstructs Julia rel_states from saved reliability means using tight
+        Beta priors. If the state includes coverage_alpha/coverage_beta, matching
+        tools' CoveragePrior is restored and cached ToolConfigs are refreshed.
         """
-        self._agent.reliability_table = np.array(state["reliability_table"], dtype=np.float64)
+        bridge = self._bridge
+        if "reliability_means" in state:
+            for t_idx, means in enumerate(state["reliability_means"]):
+                self._agent.rel_states[t_idx] = bridge.make_oracle_rel_state(means)
+
         cov_alpha = state.get("coverage_alpha", {})
         cov_beta = state.get("coverage_beta", {})
         if cov_alpha:
+            import numpy as np
             for idx, t in enumerate(self._tools):
                 if t.name not in cov_alpha:
                     continue
@@ -224,14 +240,13 @@ class Router:
 
         Returns e.g. {"web_search": {"factual": 0.83, "reasoning": 0.31}}.
         """
-        table = self._agent.reliability_table
+        bridge = self._bridge
         result: dict[str, dict[str, float]] = {}
         for t_idx, tool in enumerate(self._tools):
+            means = bridge.extract_reliability_means(self._agent.rel_states[t_idx])
             per_cat: dict[str, float] = {}
             for c_idx, cat in enumerate(self._categories):
-                alpha = table[t_idx, c_idx, 0]
-                beta = table[t_idx, c_idx, 1]
-                per_cat[cat] = float(alpha / (alpha + beta))
+                per_cat[cat] = means[c_idx]
             result[tool.name] = per_cat
         return result
 
