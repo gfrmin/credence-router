@@ -7,19 +7,19 @@ from __future__ import annotations
 
 import re
 
-import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from credence.inference.voi import ScoringRule
-
-from credence_router.config import RoutingParams, derive_routing_params
+from credence_router.config import derive_routing_params
 from credence_router.group import RouterGroup
 from credence_router.router import Router
 from credence_router.tools.coverage_prior import CoveragePrior
 from credence_router.tools.keyword_category import KeywordCategoryTool
 from credence_router.tools.simulated import make_default_simulated_tools
-from credence_router.categories import make_keyword_category_infer_fn, make_router_category_infer_fn
+from credence_router.categories import (
+    make_keyword_category_infer_fn,
+    make_router_category_infer_fn,
+)
 
 
 # --- KeywordCategoryTool ---
@@ -79,20 +79,6 @@ class TestCoveragePrior:
         cov = cp.coverage()
         assert cov[0] == pytest.approx(0.9)
         assert cov[1] == pytest.approx(0.1)  # clipped from 0.05
-
-    def test_update_useful(self):
-        cp = CoveragePrior.from_priors(("a", "b"), {"a": 0.5, "b": 0.5}, strength=10.0)
-        cat_post = np.array([1.0, 0.0])
-        cp.update(cat_post, was_useful=True)
-        assert cp.alpha[0] == pytest.approx(6.0)
-        assert cp.beta[0] == pytest.approx(5.0)
-
-    def test_update_not_useful(self):
-        cp = CoveragePrior.from_priors(("a", "b"), {"a": 0.5, "b": 0.5}, strength=10.0)
-        cat_post = np.array([0.5, 0.5])
-        cp.update(cat_post, was_useful=False)
-        assert cp.beta[0] == pytest.approx(5.5)
-        assert cp.alpha[0] == pytest.approx(5.0)
 
     def test_serialisation_roundtrip(self):
         cp = CoveragePrior.from_priors(("a", "b", "c"), {"a": 0.8, "b": 0.2, "c": 0.5})
@@ -267,11 +253,17 @@ class TestMakeKeywordCategoryInferFn:
         }
         # Boolean mode: one match = same boost regardless of count
         infer_bool = make_keyword_category_infer_fn(
-            categories, patterns, match_boost=2.0, count_matches=False,
+            categories,
+            patterns,
+            match_boost=2.0,
+            count_matches=False,
         )
         # Count mode: multiple matches scale the boost
         infer_count = make_keyword_category_infer_fn(
-            categories, patterns, match_boost=2.0, count_matches=True,
+            categories,
+            patterns,
+            match_boost=2.0,
+            count_matches=True,
         )
         text = "attack the troll with a sword then fight again"
         d_bool = infer_bool(text)
@@ -287,7 +279,10 @@ class TestMakeKeywordCategoryInferFn:
         categories = ("a", "b")
         patterns = {"a": re.compile(r"\bfoo\b")}
         infer = make_keyword_category_infer_fn(
-            categories, patterns, match_boost=5.0, count_matches=True,
+            categories,
+            patterns,
+            match_boost=5.0,
+            count_matches=True,
         )
         dist = infer("nothing matches")
         assert_allclose(dist, 0.5)  # uniform — zero matches, zero boost

@@ -19,7 +19,7 @@ class CoveragePrior:
     """
 
     alpha: NDArray[np.float64]  # shape (num_categories,)
-    beta: NDArray[np.float64]   # shape (num_categories,)
+    beta: NDArray[np.float64]  # shape (num_categories,)
 
     @classmethod
     def from_priors(
@@ -42,13 +42,6 @@ class CoveragePrior:
     def coverage(self) -> NDArray[np.float64]:
         """E[Beta(alpha, beta)] per category, clipped to [0.1, 1.0]."""
         return np.clip(self.alpha / (self.alpha + self.beta), 0.1, 1.0)
-
-    def update(self, category_posterior: NDArray[np.float64], was_useful: bool) -> None:
-        """Soft Beta update: alpha += P(c) on success, beta += P(c) on failure."""
-        if was_useful:
-            self.alpha += category_posterior
-        else:
-            self.beta += category_posterior
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict."""

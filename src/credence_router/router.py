@@ -133,8 +133,7 @@ class Router:
         answer_posterior = tuple(self._agent.answer_posterior)
 
         tool_responses = tuple(
-            (t_idx, self._agent.tool_responses.get(t_idx))
-            for t_idx in result.tools_queried
+            (t_idx, self._agent.tool_responses.get(t_idx)) for t_idx in result.tools_queried
         )
 
         return Answer(
@@ -168,8 +167,7 @@ class Router:
     def save_state_dict(self) -> dict:
         """Return learned state as a plain dict (for embedding in larger state files).
 
-        Extracts per-tool per-category mean reliability from the Julia state.
-        If any tools carry a CoveragePrior, their alpha/beta arrays are included.
+        Extracts per-tool per-category reliability and coverage means from Julia state.
         """
         bridge = self._bridge
         # Extract approximate reliability table from Julia MixtureMeasure state
@@ -178,53 +176,50 @@ class Router:
             means = bridge.extract_reliability_means(self._agent.rel_states[t_idx])
             reliability_means.append(means)
 
-        state: dict = {
+        # Extract approximate coverage table from Julia MixtureMeasure state
+        coverage_means = []
+        for t_idx in range(len(self._tools)):
+            means = bridge.extract_reliability_means(self._agent.cov_states[t_idx])
+            coverage_means.append(means)
+
+        return {
             "reliability_means": reliability_means,
+            "coverage_means": coverage_means,
             "tool_names": [t.name for t in self._tools],
             "categories": list(self._categories),
         }
-        cov_alpha: dict[str, list] = {}
-        cov_beta: dict[str, list] = {}
-        for t in self._tools:
-            cp = getattr(t, "coverage_prior", None)
-            if cp is not None:
-                cov_alpha[t.name] = cp.alpha.tolist()
-                cov_beta[t.name] = cp.beta.tolist()
-            elif hasattr(t, "_cov_alpha") and hasattr(t, "_cov_beta"):
-                cov_alpha[t.name] = t._cov_alpha.tolist()
-                cov_beta[t.name] = t._cov_beta.tolist()
-        if cov_alpha:
-            state["coverage_alpha"] = cov_alpha
-            state["coverage_beta"] = cov_beta
-        return state
 
     def load_state_dict(self, state: dict) -> None:
         """Restore learned state from a dict.
 
-        Reconstructs Julia rel_states from saved reliability means using tight
-        Beta priors. If the state includes coverage_alpha/coverage_beta, matching
-        tools' CoveragePrior is restored and cached ToolConfigs are refreshed.
+        Reconstructs Julia rel_states and cov_states from saved means using
+        tight Beta priors. For backward compat, legacy coverage_alpha/coverage_beta
+        are converted to means if coverage_means is absent.
         """
         bridge = self._bridge
         if "reliability_means" in state:
             for t_idx, means in enumerate(state["reliability_means"]):
                 self._agent.rel_states[t_idx] = bridge.make_oracle_rel_state(means)
 
-        cov_alpha = state.get("coverage_alpha", {})
-        cov_beta = state.get("coverage_beta", {})
-        if cov_alpha:
-            import numpy as np
-            for idx, t in enumerate(self._tools):
-                if t.name not in cov_alpha:
-                    continue
-                cp = getattr(t, "coverage_prior", None)
-                if cp is not None:
-                    cp.alpha = np.array(cov_alpha[t.name], dtype=np.float64)
-                    cp.beta = np.array(cov_beta[t.name], dtype=np.float64)
-                elif hasattr(t, "_cov_alpha"):
-                    t._cov_alpha = np.array(cov_alpha[t.name], dtype=np.float64)
-                    t._cov_beta = np.array(cov_beta[t.name], dtype=np.float64)
-                self.refresh_tool_coverage(idx)
+        # Prefer coverage_means; fall back to legacy alpha/beta
+        coverage_means = state.get("coverage_means")
+        if coverage_means is None:
+            cov_alpha = state.get("coverage_alpha", {})
+            cov_beta = state.get("coverage_beta", {})
+            if cov_alpha:
+                name_to_idx = {t.name: i for i, t in enumerate(self._tools)}
+                coverage_means = [None] * len(self._tools)
+                for name in cov_alpha:
+                    idx = name_to_idx.get(name)
+                    if idx is not None:
+                        a = cov_alpha[name]
+                        b = cov_beta[name]
+                        coverage_means[idx] = [ai / (ai + bi) for ai, bi in zip(a, b)]
+
+        if coverage_means:
+            for t_idx, means in enumerate(coverage_means):
+                if means is not None:
+                    self._agent.cov_states[t_idx] = bridge.make_oracle_rel_state(means)
 
     def report_outcome(self, correct: bool) -> None:
         """Report whether the last answer was correct. Updates reliability table."""

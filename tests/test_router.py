@@ -191,12 +191,14 @@ class TestRouterToolResponses:
 class TestRouterScoringProperty:
     def test_scoring_returns_scoring_rule(self):
         from credence.inference.voi import ScoringRule
+
         tools = make_default_simulated_tools()
         router = Router(tools=tools)
         assert isinstance(router.scoring, ScoringRule)
 
     def test_custom_scoring_returned(self):
         from credence.inference.voi import ScoringRule
+
         custom = ScoringRule(reward_correct=1.0, penalty_wrong=-0.5, reward_abstain=0.0)
         tools = _make_simple_tools()
         router = Router(tools=tools, categories=("factual", "numerical"), scoring=custom)
@@ -212,8 +214,10 @@ class TestRouterRefreshCoverage:
         router.refresh_tool_coverage(0)
         # Coverage should be the same since tool hasn't changed
         import numpy as np
+
         np.testing.assert_array_equal(
-            router._tool_configs[0].coverage_by_category, old_coverage,
+            router._tool_configs[0].coverage_by_category,
+            old_coverage,
         )
 
 
@@ -223,11 +227,13 @@ class TestRouterStateDictPersistence:
         router = Router(tools=tools)
 
         for _ in range(3):
-            router.solve("What is 2^10?", ("512", "1024", "2048", "4096"), category_hint="numerical")
+            router.solve(
+                "What is 2^10?", ("512", "1024", "2048", "4096"), category_hint="numerical"
+            )
             router.report_outcome(True)
 
         state = router.save_state_dict()
-        assert "reliability_table" in state
+        assert "reliability_means" in state
         assert "tool_names" in state
         assert "categories" in state
 
@@ -240,8 +246,23 @@ class TestRouterStateDictPersistence:
             for cat in r1[tool_name]:
                 assert abs(r1[tool_name][cat] - r2[tool_name][cat]) < 1e-10
 
+    def test_coverage_means_in_saved_state(self):
+        tools = make_default_simulated_tools()
+        router = Router(tools=tools)
+
+        router.solve("What is 2^10?", ("512", "1024", "2048", "4096"), category_hint="numerical")
+        router.report_outcome(True)
+
+        state = router.save_state_dict()
+        assert "coverage_means" in state
+        assert len(state["coverage_means"]) == len(tools)
+        for means in state["coverage_means"]:
+            assert isinstance(means, list)
+            assert all(isinstance(v, float) for v in means)
+
     def test_save_state_dict_matches_save_state(self, tmp_path):
         import json
+
         tools = make_default_simulated_tools()
         router = Router(tools=tools)
         router.solve("test", ("A", "B", "C", "D"))
@@ -252,7 +273,7 @@ class TestRouterStateDictPersistence:
         router.save_state(state_path)
         file_state = json.loads(state_path.read_text())
 
-        assert state_dict["reliability_table"] == file_state["reliability_table"]
+        assert state_dict["reliability_means"] == file_state["reliability_means"]
         assert state_dict["tool_names"] == file_state["tool_names"]
         assert state_dict["categories"] == file_state["categories"]
 

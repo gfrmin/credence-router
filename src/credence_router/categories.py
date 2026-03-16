@@ -103,10 +103,7 @@ def make_router_category_infer_fn(
     from credence_router.router import Router
     from credence_router.tools.keyword_category import KeywordCategoryTool
 
-    tools = [
-        KeywordCategoryTool(cat, pat, categories)
-        for cat, pat in keyword_patterns.items()
-    ]
+    tools = [KeywordCategoryTool(cat, pat, categories) for cat, pat in keyword_patterns.items()]
     if llm_classifier is not None:
         tools.append(llm_classifier)
 
