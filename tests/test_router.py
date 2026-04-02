@@ -190,14 +190,14 @@ class TestRouterToolResponses:
 
 class TestRouterScoringProperty:
     def test_scoring_returns_scoring_rule(self):
-        from credence.inference.voi import ScoringRule
+        from credence_agents.inference.voi import ScoringRule
 
         tools = make_default_simulated_tools()
         router = Router(tools=tools)
         assert isinstance(router.scoring, ScoringRule)
 
     def test_custom_scoring_returned(self):
-        from credence.inference.voi import ScoringRule
+        from credence_agents.inference.voi import ScoringRule
 
         custom = ScoringRule(reward_correct=1.0, penalty_wrong=-0.5, reward_abstain=0.0)
         tools = _make_simple_tools()

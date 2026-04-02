@@ -10,7 +10,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from credence.environment.questions import Question, get_questions
+from credence_agents.environment.questions import Question, get_questions
 
 from credence_router.answer import Answer
 

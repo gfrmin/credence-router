@@ -1,6 +1,6 @@
-"""Question bank — re-exports from credence."""
+"""Question bank — re-exports from credence_agents."""
 
-from credence.environment.questions import (
+from credence_agents.environment.questions import (
     QUESTION_BANK,
     Question,
     get_questions,

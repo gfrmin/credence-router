@@ -10,11 +10,11 @@ import json
 import time
 from pathlib import Path
 
-from credence.agents.bayesian_agent import BayesianAgent
-from credence.agents.common import DecisionStep
-from credence.environment.categories import CATEGORIES, make_keyword_category_infer_fn
-from credence.inference.voi import ScoringRule, ToolConfig
-from credence.julia_bridge import CredenceBridge
+from credence_agents.agents.bayesian_agent import BayesianAgent
+from credence_agents.agents.common import DecisionStep
+from credence_agents.environment.categories import CATEGORIES, make_keyword_category_infer_fn
+from credence_agents.inference.voi import ScoringRule, ToolConfig
+from credence_agents.julia_bridge import CredenceBridge
 
 from credence_router.answer import Answer
 from credence_router.tool import Tool

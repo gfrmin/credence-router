@@ -12,7 +12,7 @@ from collections.abc import Callable
 import numpy as np
 from numpy.typing import NDArray
 
-from credence.environment.categories import (
+from credence_agents.environment.categories import (
     CATEGORIES,
     NUM_CATEGORIES,
 )

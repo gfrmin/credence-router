@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from credence.inference.voi import ScoringRule
+from credence_agents.inference.voi import ScoringRule
 
 
 @dataclass(frozen=True)
